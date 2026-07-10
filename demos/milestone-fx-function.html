@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<title>MilestoneFx · 卫星节点常驻反馈（含蓄版）</title>
+<style>
+  :root{ --bg:#1A1A1A; --green:#9EFF00; --gold:#EFC94C; --dim:#5a6b5a; }
+  *{ box-sizing:border-box; }
+  body{ margin:0; background:var(--bg); color:#cfd6cf; font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif; }
+  .wrap{ max-width:760px; margin:0 auto; padding:24px 16px 48px; }
+  h1{ font-size:18px; font-weight:600; color:#e8efe8; }
+  .sub{ font-size:13px; color:#8a948a; margin:6px 0 18px; line-height:1.6; }
+  .stage{ background:#151715; border:1px solid #2a2f2a; border-radius:12px; padding:16px; display:flex; justify-content:center; }
+  canvas{ width:420px; height:420px; }
+  .btns{ display:flex; gap:8px; flex-wrap:wrap; margin-top:16px; }
+  button{ background:#222822; color:var(--green); border:1px solid #354035; border-radius:8px; padding:8px 14px; font-size:13px; cursor:pointer; }
+  button:hover{ background:#2c342c; }
+  .note{ font-size:12px; color:#7a847a; margin-top:14px; line-height:1.7; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>里程碑反馈 · 卫星节点（含蓄常驻）</h1>
+  <div class="sub">进度环 = 卫星轨道。已通关章的轨道段上亮起一排<b>小卫星</b>（每关约一颗），常驻、极淡、缓慢呼吸；全通则整环转金 + 极淡金晕。<br>这是设定里真实存在的物件（能量卫星），一眼读懂"这些轨道段已上线"，不再是无所指的抽象波纹。</div>
+  <div class="stage"><canvas id="c" width="420" height="420"></canvas></div>
+  <div class="btns">
+    <button data-n="0">0 / 48</button>
+    <button data-n="12">第1章通 (12)</button>
+    <button data-n="24">通 2 章 (24)</button>
+    <button data-n="36">通 3 章 (36)</button>
+    <button data-n="48">全通 (48)</button>
+  </div>
+  <div class="note">透明度对照（Cocos 版可整体调）：节点核心 ~80α / 外晕 ~14α / 轨道微辉 ~22α，受 intensity 系数缩放。若仍偏亮，把 intensity 拉到 0.5 左右即可。</div>
+</div>
+<script>
+const cv = document.getElementById('c'); const ctx = cv.getContext('2d');
+const W=420,H=420,CX=210,CY=210, R=120, PR=88;
+const GREEN='#9EFF00', GOLD='#EFC94C';
+let done = 12;            // 当前已通关数（0~48）
+let t = 0;
+function arcAng(n){ return -Math.PI/2 + (n/48)*Math.PI*2; }  // 累计关数 → 角度
+function sectors(){
+  const segs=[]; let cum=0;
+  for(let ch=0; ch<4; ch++){
+    const total=12;
+    if(done >= cum+total) segs.push([arcAng(cum), arcAng(cum+total)]);
+    cum+=total;
+  }
+  return segs;
+}
+function draw(){
+  ctx.clearRect(0,0,W,H);
+  // 地球（恒定锚点）
+  const grd=ctx.createRadialGradient(CX-30,CY-30,8,CX,CY,PR);
+  grd.addColorStop(0,'#3a6ea5'); grd.addColorStop(1,'#1d3f63');
+  ctx.fillStyle=grd; ctx.beginPath(); ctx.arc(CX,CY,PR,0,7); ctx.fill();
+  // 暗色底环
+  ctx.strokeStyle='rgba(235,240,235,0.10)'; ctx.lineWidth=1.5;
+  ctx.beginPath(); ctx.arc(CX,CY,R,0,7); ctx.stroke();
+  // 进度弧（绿）
+  ctx.strokeStyle=GREEN; ctx.lineWidth=2.2;
+  ctx.beginPath(); ctx.arc(CX,CY,R,-Math.PI/2,arcAng(done)); ctx.stroke();
+  // 章界淡刻度
+  ctx.strokeStyle='rgba(235,240,235,0.25)'; ctx.lineWidth=2;
+  for(let k=1;k<4;k++){ const a=arcAng(k*12);
+    ctx.beginPath(); ctx.moveTo(CX+Math.cos(a)*(R-5),CY+Math.sin(a)*(R-5)); ctx.lineTo(CX+Math.cos(a)*(R+5),CY+Math.sin(a)*(R+5)); ctx.stroke(); }
+
+  const all = done>=48;
+  const col = all?GOLD:GREEN;
+  // 全通金晕
+  if(all){ const b=0.5+0.5*Math.sin(t*0.9);
+    ctx.strokeStyle=`rgba(239,201,76,${0.28*b})`; ctx.lineWidth=1.1;
+    ctx.beginPath(); ctx.arc(CX,CY,R+3,0,7); ctx.stroke();
+    ctx.fillStyle=`rgba(239,201,76,${0.05*b})`; ctx.beginPath(); ctx.arc(CX,CY,PR+9,0,7); ctx.fill(); }
+
+  // 卫星节点
+  for(const [s,e] of sectors()){
+    const span=e-s; const count=Math.max(1,Math.round(span/(Math.PI*2)*48));
+    // 通电微辉
+    ctx.strokeStyle = hexA(col, all?0.10:0.09); ctx.lineWidth=2.2;
+    ctx.beginPath(); ctx.arc(CX,CY,R,s,e); ctx.stroke();
+    for(let i=0;i<count;i++){
+      const a=s+((i+0.5)/count)*span;
+      const x=CX+Math.cos(a)*R, y=CY+Math.sin(a)*R;
+      const breath=1-0.225+Math.sin(t*1.1+i*0.7)*0.225;
+      ctx.fillStyle=hexA(col, 0.06*breath); ctx.beginPath(); ctx.arc(x,y,4.6,0,7); ctx.fill();
+      ctx.fillStyle=hexA(col, 0.32*breath); ctx.beginPath(); ctx.arc(x,y,1.8,0,7); ctx.fill();
+    }
+  }
+  ctx.fillStyle='#9aa69a'; ctx.font='12px sans-serif'; ctx.textAlign='center';
+  ctx.fillText(`${done} / 48   ·   ${all?'全网在线 (金)':'卫星节点常驻'}`, CX, H-14);
+}
+function hexA(hex,a){ const n=parseInt(hex.slice(1),16); const r=(n>>16)&255,g=(n>>8)&255,b=n&255; return `rgba(${r},${g},${b},${a})`; }
+function loop(){ t+=0.016; draw(); requestAnimationFrame(loop); }
+loop();
+document.querySelectorAll('button').forEach(b=>b.onclick=()=>done=+b.dataset.n);
+</script>
+</body>
+</html>

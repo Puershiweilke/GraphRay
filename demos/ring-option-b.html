@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<title>状态环方案 B · 双环（章节状态带 + 进度弧）</title>
+<style>
+  html,body{margin:0;height:100%;background:#1A1A1A;color:#cfcfcf;font-family:'Segoe UI','Microsoft YaHei',sans-serif;}
+  .wrap{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100%;padding:24px 0;box-sizing:border-box;}
+  h2{font-weight:400;letter-spacing:2px;color:#9EFF00;margin:0 0 6px;font-size:20px;}
+  .sub{font-size:13px;color:#8a8a8a;margin-bottom:14px;}
+  .legend{display:flex;gap:18px;margin-top:16px;font-size:13px;color:#bbb;}
+  .legend i{display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:6px;vertical-align:-1px;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h2>方案 B · 双环（章节状态带 + 进度弧）</h2>
+  <div class="sub">外环 = 章状态(实/虚/暗) · 内环 = 整体进度(12 点顺时针)</div>
+  <svg id="ring" width="460" height="460" viewBox="0 0 460 460"></svg>
+  <div class="legend">
+    <span><i style="background:#9EFF00"></i>已完成·实心+辉光</span>
+    <span><i style="background:#EF9F27"></i>进行中·流动虚线</span>
+    <span><i style="background:#3A3A3A"></i>锁定·暗虚线</span>
+  </div>
+</div>
+<script>
+const NS='http://www.w3.org/2000/svg';
+const svg=document.getElementById('ring');
+const cx=230,cy=230;
+const C={green:'#9EFF00',amber:'#EF9F27',gray:'#3A3A3A',track:'#262626',glow:'#CFFF7E'};
+const chapters=[{n:'第一章',done:12,total:12,state:'done'},{n:'第二章',done:5,total:12,state:'current'},{n:'第三章',done:0,total:12,state:'locked'},{n:'第四章',done:0,total:12,state:'locked'}];
+const done=chapters.reduce((s,c)=>s+c.done,0),total=chapters.reduce((s,c)=>s+c.total,0),cc=chapters.filter(c=>c.state==='done').length;
+function pt(r,deg){const a=deg*Math.PI/180;return [cx+r*Math.sin(a),cy-r*Math.cos(a)];}
+function arc(r,start,end,color,w,opts){opts=opts||{};const[x1,y1]=pt(r,start),[x2,y2]=pt(r,end);const large=((end-start)%360+360)%360>180?1:0;const p=document.createElementNS(NS,'path');p.setAttribute('d',`M ${x1} ${y1} A ${r} ${r} 0 ${large} 1 ${x2} ${y2}`);p.setAttribute('stroke',color);p.setAttribute('stroke-width',w);p.setAttribute('fill','none');if(opts.dash)p.setAttribute('stroke-dasharray',opts.dash);if(opts.op!=null)p.setAttribute('opacity',opts.op);svg.appendChild(p);}
+function line(r1,r2,deg,color,w){const[x1,y1]=pt(r1,deg),[x2,y2]=pt(r2,deg);const l=document.createElementNS(NS,'line');l.setAttribute('x1',x1);l.setAttribute('y1',y1);l.setAttribute('x2',x2);l.setAttribute('y2',y2);l.setAttribute('stroke',color);l.setAttribute('stroke-width',w);svg.appendChild(l);}
+function txt(s,y,size,color,fw){const e=document.createElementNS(NS,'text');e.setAttribute('x',cx);e.setAttribute('y',y);e.setAttribute('fill',color);e.setAttribute('font-size',size);e.setAttribute('text-anchor','middle');e.setAttribute('font-weight',fw||400);e.textContent=s;svg.appendChild(e);}
+const Ro=162,Ri=120;
+arc(Ri,0,360,C.track,8,{op:0.5});
+arc(Ro,0,360,C.track,9,{op:0.4});
+const fdone=done/total;
+arc(Ri,0,360*fdone,C.green,8);
+let acc=0;const seg=90;
+chapters.forEach((ch,i)=>{
+  const s=acc,e=acc+seg;
+  if(ch.state==='done'){arc(Ro,s,e,C.green,9);arc(Ro-7,s,e,C.glow,3,{op:0.85});}
+  else if(ch.state==='current'){arc(Ro,s,e,C.amber,9,{dash:'3 7'});}
+  else{arc(Ro,s,e,C.gray,9,{dash:'3 7'});}
+  line(Ro-14,Ro+14,s,'#666',2);
+  const[lx,ly]=pt(Ro+30,s+seg/2);const lab=document.createElementNS(NS,'text');lab.setAttribute('x',lx);lab.setAttribute('y',ly+5);lab.setAttribute('fill','#aaa');lab.setAttribute('font-size','15');lab.setAttribute('text-anchor','middle');lab.textContent=(i+1);svg.appendChild(lab);
+  acc=e;
+});
+txt(done+' / '+total,cy-2,40,C.green,700);
+txt('✓ '+cc+' 章',cy+28,15,'#aaa');
+</script>
+</body></html>

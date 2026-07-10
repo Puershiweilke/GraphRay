@@ -1,0 +1,316 @@
+{
+  "chapters": [
+    {
+      "id": 1,
+      "name": "[第1章名称待定]",
+      "levels": [
+        {
+          "globalId": 1,
+          "name": "[关卡1名称待定]",
+          "description": "[关卡描述待定关卡描述待定关卡描述待定关卡描述待定关卡描述待定关卡描述待定关卡描述待定关卡描述待定关卡描述待定关卡描述待定关卡描述待定关卡描述待定关卡描述待定关卡描述待定关卡描述待定关卡描述待定关卡描述待定关卡描述待定关卡描述待定关卡描述待定关卡描述待定关卡描述待定关卡描述待定关卡描述待定关卡描述待定关卡描述待定关卡描述待定关卡描述待定关卡描述待定关卡描述待定关卡描述待定关卡描述待定关卡描述待定关卡描述待定关卡描述待定关卡描述待定关卡描述待定关卡描述待定关卡描述待定关卡描述待定关卡描述待定关卡描述待定关卡描述待定关卡描述待定关卡描述待定关卡描述待定关卡描述待定关卡描述待定关卡描述待定关卡描述待定关卡描述待定关卡描述待定关卡描述待定关卡描述待定关卡描述待定关卡描述待定关卡描述待定关卡描述待定关卡描述待定关卡描述待定关卡描述待定关卡描述待定]",
+          "completed": true
+        },
+        {
+          "globalId": 2,
+          "name": "[关卡2名称待定]",
+          "description": "[关卡描述待定]",
+          "completed": true
+        },
+        {
+          "globalId": 3,
+          "name": "[关卡3名称待定]",
+          "description": "[关卡描述待定]",
+          "completed": false
+        },
+        {
+          "globalId": 4,
+          "name": "[关卡4名称待定]",
+          "description": "[关卡描述待定]",
+          "completed": false
+        },
+        {
+          "globalId": 5,
+          "name": "[关卡5名称待定]",
+          "description": "[关卡描述待定]",
+          "completed": false
+        },
+        {
+          "globalId": 6,
+          "name": "[关卡6名称待定]",
+          "description": "[关卡描述待定]",
+          "completed": false
+        },
+        {
+          "globalId": 7,
+          "name": "[关卡7名称待定]",
+          "description": "[关卡描述待定]",
+          "completed": false
+        },
+        {
+          "globalId": 8,
+          "name": "[关卡8名称待定]",
+          "description": "[关卡描述待定]",
+          "completed": false
+        },
+        {
+          "globalId": 9,
+          "name": "[关卡9名称待定]",
+          "description": "[关卡描述待定]",
+          "completed": false
+        },
+        {
+          "globalId": 10,
+          "name": "[关卡10名称待定]",
+          "description": "[关卡描述待定]",
+          "completed": false
+        },
+        {
+          "globalId": 11,
+          "name": "[关卡11名称待定]",
+          "description": "[关卡描述待定]",
+          "completed": false
+        },
+        {
+          "globalId": 12,
+          "name": "[关卡12名称待定]",
+          "description": "[关卡描述待定]",
+          "completed": false
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "name": "[第2章名称待定]",
+      "levels": [
+        {
+          "globalId": 13,
+          "name": "[关卡13名称待定]",
+          "description": "[关卡描述待定]",
+          "completed": false
+        },
+        {
+          "globalId": 14,
+          "name": "[关卡14名称待定]",
+          "description": "[关卡描述待定]",
+          "completed": false
+        },
+        {
+          "globalId": 15,
+          "name": "[关卡15名称待定]",
+          "description": "[关卡描述待定]",
+          "completed": false
+        },
+        {
+          "globalId": 16,
+          "name": "[关卡16名称待定]",
+          "description": "[关卡描述待定]",
+          "completed": false
+        },
+        {
+          "globalId": 17,
+          "name": "[关卡17名称待定]",
+          "description": "[关卡描述待定]",
+          "completed": false
+        },
+        {
+          "globalId": 18,
+          "name": "[关卡18名称待定]",
+          "description": "[关卡描述待定]",
+          "completed": false
+        },
+        {
+          "globalId": 19,
+          "name": "[关卡19名称待定]",
+          "description": "[关卡描述待定]",
+          "completed": false
+        },
+        {
+          "globalId": 20,
+          "name": "[关卡20名称待定]",
+          "description": "[关卡描述待定]",
+          "completed": false
+        },
+        {
+          "globalId": 21,
+          "name": "[关卡21名称待定]",
+          "description": "[关卡描述待定]",
+          "completed": false
+        },
+        {
+          "globalId": 22,
+          "name": "[关卡22名称待定]",
+          "description": "[关卡描述待定]",
+          "completed": false
+        },
+        {
+          "globalId": 23,
+          "name": "[关卡23名称待定]",
+          "description": "[关卡描述待定]",
+          "completed": false
+        },
+        {
+          "globalId": 24,
+          "name": "[关卡24名称待定]",
+          "description": "[关卡描述待定]",
+          "completed": false
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "name": "[第3章名称待定]",
+      "levels": [
+        {
+          "globalId": 25,
+          "name": "[关卡25名称待定]",
+          "description": "[关卡描述待定]",
+          "completed": false
+        },
+        {
+          "globalId": 26,
+          "name": "[关卡26名称待定]",
+          "description": "[关卡描述待定]",
+          "completed": false
+        },
+        {
+          "globalId": 27,
+          "name": "[关卡27名称待定]",
+          "description": "[关卡描述待定]",
+          "completed": false
+        },
+        {
+          "globalId": 28,
+          "name": "[关卡28名称待定]",
+          "description": "[关卡描述待定]",
+          "completed": false
+        },
+        {
+          "globalId": 29,
+          "name": "[关卡29名称待定]",
+          "description": "[关卡描述待定]",
+          "completed": false
+        },
+        {
+          "globalId": 30,
+          "name": "[关卡30名称待定]",
+          "description": "[关卡描述待定]",
+          "completed": false
+        },
+        {
+          "globalId": 31,
+          "name": "[关卡31名称待定]",
+          "description": "[关卡描述待定]",
+          "completed": false
+        },
+        {
+          "globalId": 32,
+          "name": "[关卡32名称待定]",
+          "description": "[关卡描述待定]",
+          "completed": false
+        },
+        {
+          "globalId": 33,
+          "name": "[关卡33名称待定]",
+          "description": "[关卡描述待定]",
+          "completed": false
+        },
+        {
+          "globalId": 34,
+          "name": "[关卡34名称待定]",
+          "description": "[关卡描述待定]",
+          "completed": false
+        },
+        {
+          "globalId": 35,
+          "name": "[关卡35名称待定]",
+          "description": "[关卡描述待定]",
+          "completed": false
+        },
+        {
+          "globalId": 36,
+          "name": "[关卡36名称待定]",
+          "description": "[关卡描述待定]",
+          "completed": false
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "name": "[第4章名称待定]",
+      "levels": [
+        {
+          "globalId": 37,
+          "name": "[关卡37名称待定]",
+          "description": "[关卡描述待定]",
+          "completed": false
+        },
+        {
+          "globalId": 38,
+          "name": "[关卡38名称待定]",
+          "description": "[关卡描述待定]",
+          "completed": false
+        },
+        {
+          "globalId": 39,
+          "name": "[关卡39名称待定]",
+          "description": "[关卡描述待定]",
+          "completed": false
+        },
+        {
+          "globalId": 40,
+          "name": "[关卡40名称待定]",
+          "description": "[关卡描述待定]",
+          "completed": false
+        },
+        {
+          "globalId": 41,
+          "name": "[关卡41名称待定]",
+          "description": "[关卡描述待定]",
+          "completed": false
+        },
+        {
+          "globalId": 42,
+          "name": "[关卡42名称待定]",
+          "description": "[关卡描述待定]",
+          "completed": false
+        },
+        {
+          "globalId": 43,
+          "name": "[关卡43名称待定]",
+          "description": "[关卡描述待定]",
+          "completed": false
+        },
+        {
+          "globalId": 44,
+          "name": "[关卡44名称待定]",
+          "description": "[关卡描述待定]",
+          "completed": false
+        },
+        {
+          "globalId": 45,
+          "name": "[关卡45名称待定]",
+          "description": "[关卡描述待定]",
+          "completed": false
+        },
+        {
+          "globalId": 46,
+          "name": "[关卡46名称待定]",
+          "description": "[关卡描述待定]",
+          "completed": false
+        },
+        {
+          "globalId": 47,
+          "name": "[关卡47名称待定]",
+          "description": "[关卡描述待定]",
+          "completed": false
+        },
+        {
+          "globalId": 48,
+          "name": "[关卡48名称待定]",
+          "description": "[关卡描述待定]",
+          "completed": false
+        }
+      ]
+    }
+  ]
+}

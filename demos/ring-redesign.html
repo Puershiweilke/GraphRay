@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8"/>
+<title>GraphRay · 状态环 redesign 提案</title>
+<style>
+  html,body{margin:0;height:100%;background:#1A1A1A;color:#cfe;font-family:Consolas,"SF Mono",monospace;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;}
+  .wrap{position:relative;width:420px;height:420px;}
+  svg{width:100%;height:100%;display:block;}
+  .panel{display:flex;align-items:center;gap:12px;}
+  input[type=range]{width:260px;accent-color:#9EFF00;}
+  button{background:#222;border:1px solid #9EFF00;color:#9EFF00;padding:6px 12px;border-radius:6px;font-family:inherit;cursor:pointer;}
+  button:hover{background:#9EFF00;color:#1A1A1A;}
+  .read{font-size:14px;letter-spacing:1px;color:#9EFF00;min-width:64px;text-align:right;}
+  .hint{font-size:12px;color:#789;max-width:440px;text-align:center;line-height:1.7;}
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <svg viewBox="0 0 420 420" id="scene">
+      <defs>
+        <filter id="glow" x="-60%" y="-60%" width="220%" height="220%">
+          <feGaussianBlur stdDeviation="3" result="b"/>
+          <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+        </filter>
+        <radialGradient id="earth" cx="38%" cy="35%" r="75%">
+          <stop offset="0%" stop-color="#3aa0d6"/>
+          <stop offset="60%" stop-color="#0e3a5f"/>
+          <stop offset="100%" stop-color="#071f33"/>
+        </radialGradient>
+      </defs>
+
+      <!-- 地球（恒定锚点） -->
+      <circle cx="210" cy="210" r="46" fill="url(#earth)"/>
+      <circle cx="210" cy="210" r="54" fill="none" stroke="#3fd0ff" stroke-opacity="0.22" stroke-width="6"/>
+      <g stroke="#bfe6ff" stroke-opacity="0.16" stroke-width="1" fill="none">
+        <ellipse cx="210" cy="210" rx="46" ry="17"/>
+        <ellipse cx="210" cy="210" rx="46" ry="33"/>
+        <line x1="164" y1="210" x2="256" y2="210"/>
+        <line x1="210" y1="164" x2="210" y2="256"/>
+      </g>
+
+      <!-- 轨道底环（暗） -->
+      <circle cx="210" cy="210" r="80" fill="none" stroke="rgba(150,160,170,0.20)" stroke-width="2"/>
+
+      <!-- 章节分隔刻度（切向粗段，非径向尖刺 → 不再像瞄准镜） -->
+      <g id="ticks" stroke="rgba(220,230,235,0.45)" stroke-width="3" fill="none" stroke-linecap="round"></g>
+
+      <!-- 全局进度弧（细 + 辉光 = 科技感） -->
+      <path id="arc" fill="none" stroke="#9EFF00" stroke-width="2.5" stroke-linecap="round" filter="url(#glow)"/>
+
+      <!-- 12点起点节点（淡） -->
+      <circle id="origin" cx="210" cy="130" r="2.4" fill="rgba(200,220,230,0.55)"/>
+
+      <!-- 进度头节点（唯一发光头） -->
+      <circle id="head" r="4" fill="#9EFF00" filter="url(#glow)"/>
+    </svg>
+  </div>
+
+  <div class="panel">
+    <input type="range" id="slider" min="0" max="48" value="17"/>
+    <span class="read" id="read">17 / 48</span>
+    <button id="play">重播生长</button>
+  </div>
+  <div class="hint">提案：单一连续进度弧（12点起·顺时针）= 全局 1~48 通关进度；绿弧末端 = 当前进度头（唯一发光节点，修复「头/原点偏差」）。章节仅以 3 处淡刻度(12/24/36)等分标示，不再是瞄准镜式径向刻度（修复「准星」观感）。细线+辉光+Svg 原生抗锯齿（修复「太粗/无科技感/无抗锯齿」）。Cocos 内将用超采样 RenderTexture 还原此清晰度。</div>
+
+<script>
+const CX=210, CY=210, R=80, TOTAL=48;
+const arc=document.getElementById('arc');
+const head=document.getElementById('head');
+const read=document.getElementById('read');
+const slider=document.getElementById('slider');
+const ticks=document.getElementById('ticks');
+
+// 章节分隔刻度：12/24/36 关处，切向短粗段（包住环线，像刻度尺而非十字准星）
+[12,24,36].forEach(lv=>{
+  const a=(-90 + (lv/TOTAL)*360)*Math.PI/180;
+  const a0=a-0.055, a1=a+0.055;
+  const x0=CX+Math.cos(a0)*R, y0=CY+Math.sin(a0)*R;
+  const x1=CX+Math.cos(a1)*R, y1=CY+Math.sin(a1)*R;
+  const p=document.createElementNS('http://www.w3.org/2000/svg','path');
+  p.setAttribute('d',`M ${x0.toFixed(2)} ${y0.toFixed(2)} A ${R} ${R} 0 0 1 ${x1.toFixed(2)} ${y1.toFixed(2)}`);
+  ticks.appendChild(p);
+});
+
+function setProgress(done){
+  const frac=done/TOTAL;
+  const end=(-90 + frac*360)*Math.PI/180;
+  const x0=CX+Math.cos(-Math.PI/2)*R, y0=CY+Math.sin(-Math.PI/2)*R;
+  const x1=CX+Math.cos(end)*R,      y1=CY+Math.sin(end)*R;
+  const large=frac>0.5?1:0;
+  arc.setAttribute('d',`M ${x0} ${y0} A ${R} ${R} 0 ${large} 1 ${x1} ${y1}`);
+  head.setAttribute('cx',x1); head.setAttribute('cy',y1);
+  read.textContent=`${Math.round(done)} / ${TOTAL}`;
+}
+
+slider.addEventListener('input',e=>setProgress(+e.target.value));
+document.getElementById('play').addEventListener('click',()=>{
+  const target=+slider.value; let t=0;
+  const step=()=>{ t+=0.7; if(t>target)t=target; setProgress(t); if(t<target) requestAnimationFrame(step); };
+  setProgress(0); requestAnimationFrame(step);
+});
+setProgress(+slider.value);
+</script>
+</body>
+</html>

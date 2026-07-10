@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<title>CoreEffect 地球逻辑预览（独立验证）</title>
+<style>
+  body{margin:0;background:#0b0e12;color:#cfe;font:14px/1.5 system-ui,sans-serif;display:flex;flex-direction:column;align-items:center;gap:12px;padding:20px}
+  h1{font-size:16px;font-weight:600;margin:4px 0}
+  .wrap{position:relative}
+  canvas{background:#1a1a1a;border:1px solid #2a3340;border-radius:10px;display:block}
+  .row{display:flex;gap:16px;align-items:center;flex-wrap:wrap;justify-content:center}
+  button{background:#222c38;color:#cfe;border:1px solid #36465a;border-radius:6px;padding:6px 12px;cursor:pointer}
+  button:hover{background:#2c3a4c}
+  .legend{font-size:12px;color:#8aa}
+  b{color:#9EFF00}
+</style>
+</head>
+<body>
+  <h1>CoreEffect 中心地球 · 逻辑预览</h1>
+  <div class="wrap"><canvas id="cv" width="720" height="405"></canvas></div>
+  <div class="row">
+    <button id="toggle">暂停/继续</button>
+    <label class="legend">自转速度 <input id="speed" type="range" min="0" max="30" value="15"> <span id="speedv">15</span> °/s</label>
+    <label class="legend">俯仰角 <input id="tilt" type="range" min="0" max="90" value="21"> <span id="tiltv">21</span>°（0=正视，90=俯视北极）</label>
+  </div>
+  <div class="legend">本页用 Canvas 2D 复刻 CoreEffect.ts 的<b>同一套绘制数学</b>（海洋基色 / 全局光影滤镜+柔光 / 经纬网 / 极简风大陆与精选岛屿（非洲·欧亚·北美·南美·中美洲·澳洲 + 格陵兰·英伦·马达加斯加·日本·新西兰）/ 正交投影 + 背面遮挡 / 绕轴自转 / 俯仰角可调）。不追求地理精确，几何化简化。</div>
+
+<script>
+const cv = document.getElementById('cv');
+const ctx = cv.getContext('2d');
+const W = cv.width, H = cv.height;
+const cx = W/2, cy = H/2;
+
+// ---- 比例：以 CoreEffect 的 planetR=44 为基准，放大 2 倍便于观察 ----
+const S = 2.0;
+const r = 44 * S;
+
+// 颜色（与 CoreEffect 一致）
+const C_OCEAN_1 = [28, 90, 134];
+const C_OCEAN_2 = [14, 58, 95];
+const C_OCEAN_3 = [7, 31, 51];
+const C_ATMOS   = [63, 208, 255];
+const C_GRID    = [191, 230, 255];
+const C_LAND_FILL = [130, 142, 110];   // 大陆填充（降饱和柔和土绿）
+const C_LAND_EDGE = [92, 104, 76];     // 海岸线描边（深一档）
+// 全局光影滤镜（覆盖整个地球表面：海洋+大陆统一受光，而非单块大陆斜面）
+const C_LIGHT_HI  = [225, 240, 255];   // 受光暖白（左上）
+const C_LIGHT_LO  = [2, 8, 16];        // 背光暗色（右下）
+
+// 参数
+const GRID_W = 3.2 * S, GRID_W_EQ = 5 * S;
+const GRID_A_LAT = 5, GRID_A_LONG = 5, GRID_A_EQ = 10;
+const ALPHA_BOOST = 4; // 仅为本预览把极淡的网格提亮，便于观察自转；Cocos 内保持原值
+const GRID_MERIDIANS = 12;
+const GRID_LATS = [-50,-30,-10,10,30,50];
+// 大陆（极简风：保留洲际位置与可辨认轮廓，几何化、平滑、简化，不追求地理精确；
+//       内陆水系不再镂空，整体简化。渲染仍走点阵光栅化，无鬼畜。）
+const CONTINENTS = [
+  // 非洲：西非 bulge → 东非之角 → 向南收窄为尖
+  [ {lon:-17,lat:21}, {lon:10,lat:34}, {lon:33,lat:31}, {lon:51,lat:11},
+    {lon:40,lat:-15}, {lon:20,lat:-35}, {lon:12,lat:-18}, {lon:8,lat:0}, {lon:-17,lat:14} ],
+  // 欧亚（亚洲特征化、仍几何简化）：欧洲西 → 北欧 → 西伯利亚北岸三折 → 远东东北角 →
+  //   东亚东岸 → 华南 → 中南半岛南凸 → 孟加拉湾 → 印度三角尖 → 印度西岸 → 阿拉伯半岛 → 小亚细亚 → 地中海东岸回欧洲
+  [ {lon:-10,lat:36}, {lon:0,lat:51}, {lon:8,lat:58}, {lon:28,lat:70},
+    {lon:60,lat:69}, {lon:100,lat:75}, {lon:140,lat:73}, {lon:170,lat:66},
+    {lon:160,lat:55}, {lon:140,lat:45}, {lon:131,lat:43}, {lon:129,lat:39},
+    {lon:129,lat:34}, {lon:126,lat:38}, {lon:122,lat:30}, {lon:118,lat:22},
+    {lon:108,lat:18}, {lon:100,lat:9}, {lon:90,lat:22}, {lon:80,lat:8},
+    {lon:72,lat:20}, {lon:60,lat:25}, {lon:52,lat:18}, {lon:45,lat:13},
+    {lon:43,lat:20}, {lon:35,lat:31}, {lon:28,lat:36}, {lon:15,lat:38} ],
+  // 北美洲：阿拉斯加 → 加拿大 → 美国东岸 → 墨西哥收窄
+  [ {lon:-165,lat:65}, {lon:-95,lat:70}, {lon:-60,lat:60}, {lon:-75,lat:40},
+    {lon:-80,lat:25}, {lon:-95,lat:17}, {lon:-110,lat:23}, {lon:-117,lat:32}, {lon:-125,lat:48} ],
+  // 中美洲（干净狭长地峡，连接北美与南美）
+  [ {lon:-95,lat:17}, {lon:-88,lat:16}, {lon:-83,lat:10}, {lon:-78,lat:8} ],
+  // 南美洲：北宽南尖
+  [ {lon:-78,lat:8}, {lon:-60,lat:5}, {lon:-35,lat:-8}, {lon:-48,lat:-25},
+    {lon:-70,lat:-55}, {lon:-73,lat:-40}, {lon:-78,lat:-12} ],
+  // 澳大利亚：圆润
+  [ {lon:114,lat:-22}, {lon:135,lat:-12}, {lon:145,lat:-15}, {lon:153,lat:-28},
+    {lon:148,lat:-38}, {lon:118,lat:-35} ],
+  // —— 精选图标式岛屿（保持可辨认性，几何化干净形状）——
+  // 格陵兰
+  [ {lon:-45,lat:60}, {lon:-20,lat:70}, {lon:-30,lat:83}, {lon:-55,lat:80}, {lon:-55,lat:65} ],
+  // 大不列颠
+  [ {lon:-5,lat:50}, {lon:-1,lat:51}, {lon:0,lat:54}, {lon:-3,lat:58}, {lon:-6,lat:57}, {lon:-7,lat:53} ],
+  // 马达加斯加
+  [ {lon:43,lat:-12}, {lon:50,lat:-15}, {lon:50,lat:-25}, {lon:45,lat:-25}, {lon:43,lat:-18} ],
+  // 日本（小弧）
+  [ {lon:130,lat:33}, {lon:138,lat:35}, {lon:143,lat:42}, {lon:141,lat:45}, {lon:136,lat:40}, {lon:132,lat:35} ],
+  // 台湾
+  [ {lon:119,lat:21}, {lon:123,lat:21}, {lon:123,lat:25}, {lon:119,lat:25} ],
+  // 海南岛
+  [ {lon:108,lat:17}, {lon:112,lat:17}, {lon:112,lat:20}, {lon:108,lat:20} ],
+  // 新西兰
+  [ {lon:172,lat:-34}, {lon:178,lat:-38}, {lon:176,lat:-42}, {lon:168,lat:-46}, {lon:167,lat:-44}, {lon:171,lat:-37} ],
+];
+
+// （内陆水体镂空已移除：极简风大陆不再单独表现地中海/黑海/红海/里海/贝加尔湖/五大湖）
+
+// 大陆点阵采样（密集填充点 + 逐点可见性测试，彻底消除地平裁切鬼畜）
+const LAND_STEP = 2;          // 采样经度/纬度步长 (度)；2° 兼顾小岛可见性与性能
+const LAND_DOT_R = 2.4 * S;   // 点半径（随 S 放大），足够大以相互重叠读作实心陆地
+
+function rgba(c,a){return `rgba(${c[0]},${c[1]},${c[2]},${a})`;}
+
+// 状态
+let phase = 0;
+let spinSpeed = 7;
+let tiltDeg = 21;
+let pitchRad = tiltDeg * Math.PI / 180;
+let running = true;
+let last = performance.now();
+
+function drawEarth(){
+  ctx.fillStyle = rgba(C_OCEAN_2,1);
+  ctx.beginPath(); ctx.arc(cx,cy,r,0,Math.PI*2); ctx.fill();
+  // 海洋基色（均匀）；整体方向性光照交由 drawLightFilter 统一处理（覆盖海+陆）。
+}
+
+function drawAtmo(){
+  const breath = 0.5 + Math.sin(performance.now()*0.0008)*0.5;
+  ctx.lineWidth = 8*S; ctx.strokeStyle = rgba(C_ATMOS, 0.06+breath*0.04); ctx.beginPath(); ctx.arc(cx,cy,r+12*S,0,Math.PI*2); ctx.stroke();
+  ctx.lineWidth = 4*S; ctx.strokeStyle = rgba(C_ATMOS, 0.12+breath*0.06); ctx.beginPath(); ctx.arc(cx,cy,r+6*S,0,Math.PI*2); ctx.stroke();
+}
+
+function drawMeridian(phi){
+  const N=32, ca=Math.cos(pitchRad), sa=Math.sin(pitchRad);
+  ctx.strokeStyle = rgba(C_GRID, GRID_A_LONG/255*ALPHA_BOOST);
+  ctx.lineWidth = GRID_W;
+  ctx.beginPath();
+  let drawing=false;
+  for(let i=0;i<=N;i++){
+    const th = -Math.PI/2 + Math.PI*i/N;
+    const ct = Math.cos(th);
+    const Xe = ct*Math.sin(phi);
+    const Ye = Math.sin(th);
+    const Ze = ct*Math.cos(phi);
+    const Yp = Ye*ca - Ze*sa;
+    const Zp = Ye*sa + Ze*ca;
+    const X = r*Xe, Y = -r*Yp;   // 北在上：canvas Y 取负
+    if(Zp>=0){ if(!drawing){ctx.moveTo(X,Y);drawing=true;} else ctx.lineTo(X,Y); }
+    else drawing=false;
+  }
+  ctx.stroke();
+}
+
+// 预采样大陆点阵：对每个大陆多边形按 LAND_STEP 网格采样其内部点（射线法），一次性存好
+let landPts = [];
+function buildLandPoints(){
+  landPts = [];
+  for(const poly of CONTINENTS){
+    let minLon=360,maxLon=-360,minLat=90,maxLat=-90;
+    for(const v of poly){ if(v.lon<minLon)minLon=v.lon; if(v.lon>maxLon)maxLon=v.lon; if(v.lat<minLat)minLat=v.lat; if(v.lat>maxLat)maxLat=v.lat; }
+    const pts=[];
+    for(let lo=minLon; lo<=maxLon; lo+=LAND_STEP){ for(let la=minLat; la<=maxLat; la+=LAND_STEP){ if(pointInPoly(lo,la,poly)) pts.push({lon:lo,lat:la}); } }
+    landPts.push(pts);
+  }
+}
+function pointInPoly(lon,lat,poly){ let inside=false; const n=poly.length; for(let i=0,j=n-1;i<n;j=i++){ const xi=poly[i].lon,yi=poly[i].lat,xj=poly[j].lon,yj=poly[j].lat; if(((yi>lat)!==(yj>lat)) && (lon < (xj-xi)*(lat-yi)/(yj-yi)+xi)) inside=!inside; } return inside; }
+
+// 大陆：点阵光栅化（替代多边形裁切，根除鬼畜）。每点先绕地轴自转，再绕 X 轴俯仰；
+// 纬度经自转后不变（北恒北），东西宽由 X 自然压缩；近地平线逐点淡出。
+function drawLand(){
+  const cph=Math.cos(phase), sph=Math.sin(phase);
+  const ca=Math.cos(pitchRad), sa=Math.sin(pitchRad);
+  // pass 1：实心内部（Zp>=0.28）一次成型、单次填充
+  ctx.fillStyle = rgba(C_LAND_FILL,1);
+  ctx.beginPath();
+  for(const cont of landPts){ for(const p of cont){
+    const la=p.lat*Math.PI/180, lo=p.lon*Math.PI/180, cl=Math.cos(la);
+    const X0=cl*Math.sin(lo), Y0=Math.sin(la), Z0=cl*Math.cos(lo);
+    const X=X0*cph+Z0*sph, Z=-X0*sph+Z0*cph;
+    const Yp=Y0*ca - Z*sa, Zp=Y0*sa + Z*ca;
+    if(Zp<0.28) continue;
+    const sx=r*X, sy=-r*Yp;   // X 不翻转（东在右）；Yp 含俯仰（北在上）
+    ctx.moveTo(sx+LAND_DOT_R, sy); ctx.arc(sx,sy,LAND_DOT_R,0,Math.PI*2);
+  }}
+  ctx.fill();
+  // pass 2：近地平线淡出通道（Zp∈[0,0.28)）逐点独立透明度
+  for(const cont of landPts){ for(const p of cont){
+    const la=p.lat*Math.PI/180, lo=p.lon*Math.PI/180, cl=Math.cos(la);
+    const X0=cl*Math.sin(lo), Y0=Math.sin(la), Z0=cl*Math.cos(lo);
+    const X=X0*cph+Z0*sph, Z=-X0*sph+Z0*cph;
+    const Yp=Y0*ca - Z*sa, Zp=Y0*sa + Z*ca;
+    if(Zp<0||Zp>=0.28) continue;
+    const fade=Math.min(1,Zp*3.5);
+    const sx=r*X, sy=-r*Yp;
+    ctx.fillStyle=rgba(C_LAND_FILL, fade);
+    ctx.beginPath(); ctx.arc(sx,sy,LAND_DOT_R,0,Math.PI*2); ctx.fill();
+  }}
+}
+
+function drawLightFilter(){
+  // 全局光影滤镜（覆盖海+陆）：方向性光照（左上受光/右下暗面）+ 多层圆叠加柔光（模糊）
+  const N=12;
+  const hx = -r*0.25, hy = -r*0.25;     // 受光中心（左上，相对星球中心）
+  const sx = r*0.28, sy = r*0.28;       // 背光中心（右下）
+  for(let i=1;i<=N;i++){
+    const f=i/N;
+    ctx.fillStyle = rgba(C_LIGHT_HI, 6/255*f);
+    ctx.beginPath(); ctx.arc(hx,hy, r*(0.55+0.45*f),0,Math.PI*2); ctx.fill();
+    ctx.fillStyle = rgba(C_LIGHT_LO, 8/255*f);
+    ctx.beginPath(); ctx.arc(sx,sy, r*(0.60+0.40*f),0,Math.PI*2); ctx.fill();
+  }
+}
+
+function drawGrid(){
+  const ca=Math.cos(pitchRad), sa=Math.sin(pitchRad);
+  // 经线
+  for(let k=0;k<GRID_MERIDIANS;k++){
+    const phi = k*(Math.PI*2/GRID_MERIDIANS) + phase;
+    drawMeridian(phi);
+  }
+  // 纬线（逐点投影 + 俯仰，仅画朝观众半球）
+  for(const latDeg of GRID_LATS){
+    const lat = latDeg*Math.PI/180;
+    const cl = Math.cos(lat), Ye = Math.sin(lat);
+    ctx.strokeStyle = rgba(C_GRID, GRID_A_LAT/255*ALPHA_BOOST); ctx.lineWidth = GRID_W;
+    ctx.beginPath();
+    let drawing=false;
+    const M=48;
+    for(let j=0;j<=M;j++){
+      const lon = j*(Math.PI*2/M) + phase;
+      const Xe = cl*Math.sin(lon), Ze = cl*Math.cos(lon);
+      const Yp = Ye*ca - Ze*sa, Zp = Ye*sa + Ze*ca;
+      const X = r*Xe, Y = -r*Yp;
+      if(Zp>=0){ if(!drawing){ctx.moveTo(X,Y);drawing=true;} else ctx.lineTo(X,Y); }
+      else drawing=false;
+    }
+    ctx.stroke();
+  }
+  // 赤道高亮（lat=0）
+  {
+    const Ye = 0;
+    ctx.strokeStyle = rgba(C_GRID, GRID_A_EQ/255*ALPHA_BOOST); ctx.lineWidth = GRID_W_EQ;
+    ctx.beginPath();
+    let drawing=false;
+    const M=48;
+    for(let j=0;j<=M;j++){
+      const lon = j*(Math.PI*2/M) + phase;
+      const Xe = Math.sin(lon), Ze = Math.cos(lon);
+      const Yp = -Ze*sa, Zp = Ze*ca;   // Ye=0
+      const X = r*Xe, Y = -r*Yp;
+      if(Zp>=0){ if(!drawing){ctx.moveTo(X,Y);drawing=true;} else ctx.lineTo(X,Y); }
+      else drawing=false;
+    }
+    ctx.stroke();
+  }
+}
+
+function drawSpin(){
+  ctx.save();
+  ctx.translate(cx,cy);
+  // 大陆（点阵光栅化 + 逐点正交投影 + 俯仰 + 逐点可见性测试）
+  drawLand();
+  // 全局光影滤镜（覆盖海+陆，在大陆之上、网格之下）
+  drawLightFilter();
+  // 经纬网（最上层，清晰）
+  drawGrid();
+  ctx.restore();
+}
+
+function frame(now){
+  const dt = Math.min(0.05,(now-last)/1000); last = now;
+  if(running) phase += spinSpeed*Math.PI/180*dt;
+  ctx.clearRect(0,0,W,H);
+  drawEarth();
+  drawAtmo();
+  drawSpin();
+  requestAnimationFrame(frame);
+}
+buildLandPoints();   // 预采样大陆点阵（运行一次）
+requestAnimationFrame(frame);
+
+document.getElementById('toggle').onclick = ()=> running = !running;
+const sp = document.getElementById('speed');
+sp.oninput = ()=>{ spinSpeed = +sp.value; document.getElementById('speedv').textContent = sp.value; };
+const tl = document.getElementById('tilt');
+tl.oninput = ()=>{ tiltDeg = +tl.value; pitchRad = tiltDeg*Math.PI/180; document.getElementById('tiltv').textContent = tl.value; };
+</script>
+</body>
+</html>

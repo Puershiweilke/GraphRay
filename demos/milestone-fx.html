@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>MilestoneFx 庆祝特效预览</title>
+<style>
+  html,body{margin:0;height:100%;background:#101012;color:#e9e9e9;
+    font-family:"Noto Sans SC","Microsoft YaHei",sans-serif;}
+  .wrap{display:flex;flex-direction:column;align-items:center;gap:14px;padding:22px;}
+  h1{font-size:17px;font-weight:600;letter-spacing:.5px;margin:4px 0 0;}
+  .sub{font-size:12px;color:#8a8f93;margin:0 0 6px;}
+  canvas{background:#1A1A1A;border:1px solid #2a2d31;border-radius:10px;
+    box-shadow:0 0 40px rgba(0,0,0,.5);}
+  .row{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;}
+  button{background:#1f2a18;color:#9EFF00;border:1px solid #36461f;
+    padding:9px 16px;border-radius:8px;font-size:13px;cursor:pointer;
+    transition:.15s;font-family:inherit;}
+  button:hover{background:#27351d;}
+  button.gold{color:#EFC34A;border-color:#4a3d18;background:#2a2415;}
+  button.gold:hover{background:#332b18;}
+  .tip{font-size:11px;color:#6e7479;max-width:480px;text-align:center;line-height:1.6;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>MilestoneFx · 通关庆祝特效</h1>
+  <p class="sub">独立于 CoreEffect，配置在地球中心、与进度环同心</p>
+  <canvas id="cv" width="480" height="480"></canvas>
+  <div class="row">
+    <button id="bCh">完成一章（小庆祝）</button>
+    <button id="bAll" class="gold">全部通关（大型金色庆祝）</button>
+    <button id="bReset">重置</button>
+  </div>
+  <p class="tip">「完成一章」= 地球外扩绿色脉冲 + 大气绿闪 + 短暂提示（一次性小变化）。<br/>
+     「全部通关」= 多重金环外扩 + 大气金闪 + 径向火花 + 进度环金闪，并留下<b>持久金色光晕</b>（小变化留存）。</p>
+</div>
+
+<script>
+const cv = document.getElementById('cv');
+const ctx = cv.getContext('2d');
+const W = cv.width, H = cv.height;
+const cx = W/2, cy = H/2;
+const PLANET_R = 44, RING_R = 60;
+const GREEN = '#9EFF00', GOLD = '#EFC34A';
+
+// 状态
+let pulses = [];   // {t,dur,delay,color,r0,r1,w}
+let glows = [];    // {t,dur,color,radius,maxA}
+let sparks = [];   // {ang,dist,speed,len}
+let allT = -1;     // 全通金环闪计时
+let allDone = false;
+let toast = null;  // {text,color,t,dur}
+let time = 0, last = performance.now();
+
+function hexA(hex, a){
+  const n = parseInt(hex.slice(1),16);
+  const r=(n>>16)&255, g=(n>>8)&255, b=n&255;
+  return `rgba(${r},${g},${b},${a})`;
+}
+
+function playChapter(){
+  pulses.push({t:0,dur:.85,delay:0,color:GREEN,r0:PLANET_R+6,r1:PLANET_R+34,w:3});
+  pulses.push({t:0,dur:1.05,delay:.16,color:GREEN,r0:PLANET_R+6,r1:PLANET_R+48,w:2});
+  glows.push({t:0,dur:.55,color:GREEN,radius:PLANET_R+10,maxA:.37});
+  showToast('第 N 章 完成', GREEN, 1.4);
+}
+function playAll(){
+  for(let i=0;i<4;i++)
+    pulses.push({t:0,dur:1.4+i*.22,delay:i*.12,color:GOLD,r0:PLANET_R+6,r1:PLANET_R+66+i*16,w:3});
+  glows.push({t:0,dur:.9,color:GOLD,radius:PLANET_R+16,maxA:.66});
+  allT = 0;
+  sparks = [];
+  const n=30;
+  for(let i=0;i<n;i++)
+    sparks.push({ang:(i/n)*Math.PI*2+Math.random()*.12,dist:PLANET_R+10,
+      speed:130+Math.random()*130,len:9+Math.random()*11});
+  allDone = true;
+  showToast('全部通关 · 卫星网络重启', GOLD, 2.8);
+}
+function showToast(text,color,dur){ toast = {text,color,t:0,dur}; }
+
+function drawEarth(){
+  // 海洋
+  const g = ctx.createRadialGradient(cx-12,cy-12,4,cx,cy,PLANET_R);
+  g.addColorStop(0,'#1f6ea0'); g.addColorStop(1,'#0a3a5e');
+  ctx.fillStyle=g; ctx.beginPath(); ctx.arc(cx,cy,PLANET_R,0,7); ctx.fill();
+  // 经纬网
+  ctx.strokeStyle='rgba(191,230,255,.12)'; ctx.lineWidth=1;
+  for(let k=0;k<6;k++){const a=k*Math.PI/6;
+    ctx.beginPath();
+    ctx.ellipse(cx,cy,PLANET_R*Math.abs(Math.cos(a)),PLANET_R,0,0,7);ctx.stroke();}
+  for(let k=-2;k<=2;k++){const yy=cy+k*PLANET_R/3;
+    const w=Math.sqrt(Math.max(0,PLANET_R*PLANET_R-(yy-cy)*(yy-cy)));
+    ctx.beginPath();ctx.moveTo(cx-w,yy);ctx.lineTo(cx+w,yy);ctx.stroke();}
+  // 大气
+  ctx.strokeStyle='rgba(63,208,255,.18)'; ctx.lineWidth=6;
+  ctx.beginPath();ctx.arc(cx,cy,PLANET_R+8,0,7);ctx.stroke();
+}
+function drawTrack(){
+  ctx.strokeStyle='rgba(80,90,100,.5)'; ctx.lineWidth=1.5;
+  ctx.beginPath();ctx.arc(cx,cy,RING_R,0,7);ctx.stroke();
+  // 章节刻度（4段）
+  for(let i=1;i<4;i++){const a=-Math.PI/2+i*Math.PI/2;
+    ctx.strokeStyle='rgba(225,235,230,.5)';ctx.lineWidth=3;
+    ctx.beginPath();ctx.arc(cx,cy,RING_R,a-.06,a+.06);ctx.stroke();}
+}
+function draw(){
+  ctx.clearRect(0,0,W,H);
+  drawTrack();
+  drawEarth();
+
+  // 大气闪光
+  for(const gl of glows){
+    const p=Math.min(1,gl.t/gl.dur);
+    ctx.fillStyle=hexA(gl.color,(gl.maxA*(1-p)));
+    ctx.beginPath();ctx.arc(cx,cy,gl.radius,0,7);ctx.fill();
+  }
+  // 脉冲环
+  for(const pu of pulses){
+    const p=(pu.t-pu.delay)/pu.dur; if(p<0||p>1)continue;
+    const r=pu.r0+(pu.r1-pu.r0)*p;
+    ctx.strokeStyle=hexA(pu.color,0.92*(1-p));ctx.lineWidth=pu.w;
+    ctx.beginPath();ctx.arc(cx,cy,r,0,7);ctx.stroke();
+  }
+  // 全通金环闪
+  if(allT>=0&&allT<=2.4){
+    const p=allT/2.4;
+    ctx.strokeStyle=hexA(GOLD,0.82*(1-p));ctx.lineWidth=3.2;
+    ctx.beginPath();ctx.arc(cx,cy,RING_R,0,7);ctx.stroke();
+  }
+  // 火花
+  for(const s of sparks){
+    const fade=1-s.dist/(RING_R+130); if(fade<=0)continue;
+    const x1=cx+Math.cos(s.ang)*s.dist, y1=cy+Math.sin(s.ang)*s.dist;
+    const x2=cx+Math.cos(s.ang)*(s.dist+s.len), y2=cy+Math.sin(s.ang)*(s.dist+s.len);
+    ctx.strokeStyle=hexA(GOLD,Math.max(0,fade));ctx.lineWidth=2;
+    ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);ctx.stroke();
+  }
+  // 持久金晕
+  if(allDone){
+    const b=0.5+Math.sin(time*1.4)*0.5;
+    ctx.strokeStyle=hexA(GOLD,0.22+b*0.14);ctx.lineWidth=1.6;
+    ctx.beginPath();ctx.arc(cx,cy,RING_R,0,7);ctx.stroke();
+    ctx.fillStyle=hexA(GOLD,0.055+b*0.04);
+    ctx.beginPath();ctx.arc(cx,cy,PLANET_R+12,0,7);ctx.fill();
+  }
+  // 提示
+  if(toast){
+    const p=toast.t/toast.dur;
+    let a=1;
+    if(p<0.18)a=p/0.18; else if(p>0.7)a=Math.max(0,(1-p)/0.3);
+    ctx.fillStyle=hexA(toast.color,a);
+    ctx.font='600 19px "Noto Sans SC",sans-serif';
+    ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.fillText(toast.text,cx,cy-PLANET_R-58);
+  }
+}
+function loop(now){
+  const dt=Math.min(0.05,(now-last)/1000); last=now; time+=dt;
+  for(const p of pulses)p.t+=dt; for(const g of glows)g.t+=dt;
+  for(const s of sparks)s.dist+=s.speed*dt;
+  if(allT>=0)allT+=dt;
+  pulses=pulses.filter(p=>p.t<=p.dur+p.delay);
+  glows=glows.filter(g=>g.t<=g.dur);
+  sparks=sparks.filter(s=>s.dist<RING_R+130);
+  if(allT>2.4)allT=-1;
+  if(toast){toast.t+=dt; if(toast.t>toast.dur)toast=null;}
+  draw();
+  requestAnimationFrame(loop);
+}
+document.getElementById('bCh').onclick=playChapter;
+document.getElementById('bAll').onclick=playAll;
+document.getElementById('bReset').onclick=()=>{
+  pulses=[];glows=[];sparks=[];allT=-1;allDone=false;toast=null;};
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
