@@ -43,8 +43,11 @@ zzy-cocoscreator-dev.zip
 
 #//////////////////////////
 # 本地开发配置（含私密信息，永不入库）
-# 说明：assets/scripts/core/Config.ts 为本地开发配置（GitHub token 等），已忽略；
-#       提交模板见仓库根目录 Config.example.ts，新环境复制为 Config.ts 后本地填入。
+# 说明：
+#   - assets/scripts/core/Config.ts 为「游戏运行时配置」（本地私有，会被打包进游戏，
+#     仅放分发无妨的运行参数），已忽略；模板见仓库根目录 Config.example.ts。
+#   - 仓库根 .env 为「开发 / CI 机密」（GitHub token 等），已忽略，且不参与游戏打包。
 #//////////////////////////
 assets/scripts/core/Config.ts
 assets/scripts/core/Config.ts.meta
+.env
