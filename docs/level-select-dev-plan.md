@@ -2,7 +2,7 @@
 
 > 对应需求文档：`docs/level-select-requirements.md`
 > 创建日期：2026-07-06
-> 状态：开发前规划，待执行
+> ✅ **状态：已验收（2026-07-10）** —— 本方案规划的 Step 0–7 全部落地并实机验收通过。文中规划与最终实机形态一致（含 BubblePopup 取代 LevelInfoCard、引导线 L 型锚定、分辨率 SHOW_ALL 等后续收敛项）。
 
 ---
 

@@ -308,8 +308,8 @@ export class LevelSelectBootstrap extends Component {
         for (let ci = 0; ci < count; ci++) {
             const ch = LevelDataManager.instance.getChapterByIndex(ci);
             if (!ch) { states.push('locked'); continue; }
-            const done = ch.completedIds.length;
-            const total = ch.levels.length;
+            const done = ch.completedIds?.length ?? 0;
+            const total = ch.levels?.length ?? 0;
             if (done >= total) states.push('done');
             else if (LevelDataManager.instance.isChapterAccessible(ci)) states.push('pending');
             else states.push('locked');
@@ -433,6 +433,7 @@ export class LevelSelectBootstrap extends Component {
         for (let ci = 0; ci < 4; ci++) {
             const chData = LevelDataManager.instance.getChapterByIndex(ci);
             if (!chData) continue;
+            if (!Array.isArray(chData.completedIds)) chData.completedIds = [];
             chData.completedIds.length = 0;
             const base = ci * 12 + 1;
             for (let gid = base; gid < base + 12 && gid <= count; gid++) {
@@ -508,15 +509,21 @@ export class LevelSelectBootstrap extends Component {
                 if (Config.DEBUG) console.log(`[TEST] ← 切换到第 ${this._currentChapter} 章`);
                 this._switchChapter(this._currentChapter - 1);
             } else if (Config.DEBUG) {
-                if      (e.keyCode === KeyCode.DIGIT_0) { this._applyDebugPreset(0);  }
-                else if (e.keyCode === KeyCode.DIGIT_1) { this._applyDebugPreset(6);  }
-                else if (e.keyCode === KeyCode.DIGIT_2) { this._applyDebugPreset(12); }
-                else if (e.keyCode === KeyCode.DIGIT_3) { this._applyDebugPreset(18); }
-                else if (e.keyCode === KeyCode.DIGIT_4) { this._applyDebugPreset(24); }
-                else if (e.keyCode === KeyCode.DIGIT_5) { this._applyDebugPreset(30); }
-                else if (e.keyCode === KeyCode.DIGIT_6) { this._applyDebugPreset(36); }
-                else if (e.keyCode === KeyCode.DIGIT_7) { this._applyDebugPreset(42); }
-                else if (e.keyCode === KeyCode.DIGIT_8) { this._applyDebugPreset(48); }
+                try {
+                    if      (e.keyCode === KeyCode.DIGIT_0) { this._applyDebugPreset(0);  }
+                    else if (e.keyCode === KeyCode.DIGIT_1) { this._applyDebugPreset(6);  }
+                    else if (e.keyCode === KeyCode.DIGIT_2) { this._applyDebugPreset(12); }
+                    else if (e.keyCode === KeyCode.DIGIT_3) { this._applyDebugPreset(18); }
+                    else if (e.keyCode === KeyCode.DIGIT_4) { this._applyDebugPreset(24); }
+                    else if (e.keyCode === KeyCode.DIGIT_5) { this._applyDebugPreset(30); }
+                    else if (e.keyCode === KeyCode.DIGIT_6) { this._applyDebugPreset(36); }
+                    else if (e.keyCode === KeyCode.DIGIT_7) { this._applyDebugPreset(42); }
+                    else if (e.keyCode === KeyCode.DIGIT_8) { this._applyDebugPreset(48); }
+                } catch (err) {
+                    // 防崩溃：若调试预设意外抛错（如数据异常），捕获并打出完整堆栈便于定位，
+                    // 不再让单个 TypeError 中断交互。
+                    console.error('[DEBUG] 进度预设执行出错（已捕获，不影响游戏）：', err);
+                }
             }
         });
 

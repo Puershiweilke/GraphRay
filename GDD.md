@@ -4,6 +4,7 @@
 > 创建日期：2026-06-27\
 > 文档版本：v0.10（2026-07-06：需求文档瘦身为纯效果/美术；新增开发方案 docs/level-select-dev-plan.md；决策 E/F 确立：SessionState 跨场景传参 + chapters 三文件分层）\
 > 文档版本：v0.11（2026-07-09：确立字体策略=本地 Font 资源双字体，新增子集化管线 tools/subset_cjk.py，详见 `docs/font-pipeline.md`）
+> 文档版本：v0.12（2026-07-10：关卡选择界面 **验收完成**；分辨率适配策略更正为 `SHOW_ALL`（contain，不裁切）；本轮新踩坑/偏好已沉淀进 `zzy-cocoscreator-dev` skill #21–#26）
 
 ***
 
@@ -160,11 +161,11 @@ GraphRay/
 | 项目    | 设置                 |
 | ----- | ------------------ |
 | 设计分辨率 | 1920×1080（16:9 横屏） |
-| 适配模式  | Fit Width（适配屏幕宽度）  |
+| 适配模式  | `SHOW_ALL`（contain，整块画布完整可见，**不裁切**边角 HUD） |
 | 手机方向  | 锁横屏（landscape）     |
 | PC 体验 | 原生横屏，无需额外适配        |
 
-> **决策理由**：GraphRay 核心玩法是"函数射线射击"，需要横向空间展示函数图像轨迹。1920×1080 + Fit Width 确保水平方向始终完整，不同比例屏幕的高度差异由 Cocos 自动处理。手机端锁横屏以统一 PC/移动端体验。
+> **决策理由（2026-07-10 更正）**：早期记作"Fit Width"，实机验收发现 Fit Width 会裁掉设计画布的顶部 / 底部，导致右上角"返回主菜单"按钮、底部章节圆点等**角标 HUD 被切掉不可见**。现统一用 `view.setResolutionPolicy(ResolutionPolicy.SHOW_ALL)`（contain）——整块 1920×1080 完整呈现、任意横屏宽高比下角标都贴角可见（配合 `Widget` 对齐角落）。`SHOW_ALL` 是全局 view 策略、对所有场景生效。战斗场景若日后需要不同策略再单独评估。
 
 ### 7.2 平台登录
 
@@ -283,6 +284,8 @@ GraphRay/
 
 ## 11. 关卡选择界面
 
+> ✅ **状态：验收完成（2026-07-10）** —— Step 0–7 全部落地，实机验收通过（含引导线 L 型锚定、面板初始上移、Ctrl+1 调试预设不崩溃等本轮收尾项）。
+>
 > 详见 `docs/level-select-requirements.md`（完整需求档案，纯效果/美术描述）
 > 详见 `docs/level-select-dev-plan.md`（开发方案，含实现原则、数据模型、架构分层）
 
@@ -295,20 +298,26 @@ GraphRay/
 * **HTML 原型**：`outputs/graphray-levelselect.html`
 * **Ardot 设计稿**：`GraphRay-LevelSelect`（ID: `699900019329800`）
 
-### 11.1 代码层进度（已回滚，待重建）
+### 11.1 代码层进度（✅ 已验收，2026-07-10）
 
-> ⚠️ 项目回滚后，以下脚本已不存在，需根据需求文档重新创建：
+> ✅ 以下脚本均已实现并随关卡选择界面一起验收完成（文件路径与职责见 §11.4 决策 B 分层）。
 
-| 文件 | 层级 | 说明 |
-|------|------|------|
-| `core/LevelDataManager.ts` | core/ | ✅ 单例，加载 chapters.json + 状态推导（completedCount → 4 种状态）+ localStorage 进度读写 |
-| `level-select/StarfieldEffect.ts` | level-select/ | 180 颗星点闪烁 + 数学符号上浮（Graphics 绘制） |
-| `ui-tools/OrbitParticles.ts` | ui-tools/ | 椭圆轨道绿色光点粒子（30 个同时存在，支持涌向核心/批量重生） |
-| `ui-tools/ScanSweep.ts` | ui-tools/ | 章节切换时的绿色扫描线（tween 驱动） |
-| `ui-tools/LevelNode.ts` | ui-tools/ | 4 状态视觉（complete/challengeable/unlocked/locked）+ 呼吸/脉冲动画 + 点击选中 |
-| `ui-tools/LevelInfoCard.ts` | ui-tools/ | 圆角信息卡片，内容切换淡入淡出 150ms |
-| `ui-tools/ChapterTransition.ts` | ui-tools/ | 三段式过渡控制器（Shutdown→Reconfigure→Boot-up，Promise 驱动） |
-| `ui-tools/LevelSelectBootstrap.ts` | ui-tools/ | 场景入口，onLoad 时构建全部 UI 节点（仿 SettingsPanel 模式） |
+| 文件 | 层级 | 说明 | 状态 |
+|------|------|------|------|
+| `core/LevelDataManager.ts` | core/ | 单例，加载 chapters.json + 状态推导（4 种状态）+ localStorage/服务端双存进度读写 + 开发期护栏校验 | ✅ |
+| `core/SessionState.ts` | core/ | 会话态单例（selectedLevelId / currentChapterIndex），不持久化 | ✅ |
+| `level-select/BubblePopup.ts` | level-select/ | 关卡详情气泡（含 L 型引导线、上角锚定、初始上移、缩放生长动画） | ✅ |
+| `ui-tools/OrbitParticles.ts` | ui-tools/ | 椭圆轨道绿色光点粒子 | ✅ |
+| `ui-tools/ScanSweep.ts` | ui-tools/ | 章节切换时的绿色扫描线（tween 驱动） | ✅ |
+| `ui-tools/LevelNode.ts` | ui-tools/ | 4 状态视觉 + 呼吸/脉冲动画 + 点击选中 + Lissajous 浮动 | ✅ |
+| `ui-tools/LevelInfoCard.ts` | ui-tools/ | 圆角信息卡片，内容切换淡入淡出 | ✅（由 BubblePopup 取代） |
+| `ui-tools/ChapterDots.ts` | ui-tools/ | 底部章节圆点导航（命中框与视觉解耦，切章恒定不淡出） | ✅ |
+| `ui-tools/ChapterTransition.ts` | ui-tools/ | 三段式过渡控制器（Shutdown→Reconfigure→Boot-up，Promise 驱动） | ✅ |
+| `ui-tools/ChapterTitle.ts` | ui-tools/ | 章名主副标题，随扫描线淡入淡出 | ✅ |
+| `ui-tools/CoreEffect.ts` | ui-tools/ | 地球 + 状态环（全局进度 1~48 映射，恒定锚点不淡出） | ✅ |
+| `ui-tools/LevelSelectBootstrap.ts` | ui-tools/ | 场景入口，onLoad 时构建全部 UI 节点 + 装配 + 接线 + 进关卡扫描转场 | ✅ |
+
+> 注：`LevelInfoCard` 的"信息卡"职责已被 `BubblePopup`（点击节点弹出的详情气泡）取代；后者是当前实机验收的形态。
 
 **数据配置**：
 - ✅ `assets/resources/configs/levels/chapters.json` — 4 章 × 48 关完整数据（名称/描述/类型/坐标/轨道环/间章/过渡时序）
@@ -323,16 +332,16 @@ GraphRay/
 
 | # | 问题 | 状态 | 备注 |
 |---|------|------|------|
-| 1 | **关卡选择代码层已回滚** | 🔴 待重建 | 2026-07-06 校验：LevelDataManager.ts 不存在，chapters.json 目录为空。Step 0/1 均需从头重建。数据方案已调整：chapters（元数据）→ layout（布局）→ level-{id}（战斗内容）三文件分层 |
-| 2 | ~~章节背景图位置错误~~ | ✅ 已解决 | 4 张图已落入 `resources/textures/level-select/`，`chapters.json` 中 `backgroundTexture` 字段已对齐为 `level-select/chapter-X-bg`（2026-07-04 修复） |
-| 3 | **LevelSelect.scene 场景文件需重新配置** | 🟡 待做 | 当前场景引用的组件已缺失，需在 Cocos 编辑器中重新配置（按 §11.4 决策 B：混合搭建） |
-| 4 | 移动端适配未实现 | ⚪ 待做 | 节点放大 48→64px，信息卡改底部弹窗 |
-| 5 | "进入关卡"按钮无跳转目标 | ⚪ 待做 | 需战斗场景创建后接入 |
+| 1 | 关卡选择代码层重建 | 🟢 已验收 | 2026-07-10：Step 0–7 全部落地并实机验收通过 |
+| 2 | ~~章节背景图位置错误~~ | ✅ 已解决 | 4 张图已落入 `resources/textures/level-select/`，`chapters.json` 中 `backgroundTexture` 字段已对齐为 `level-select/chapter-X-bg` |
+| 3 | LevelSelect.scene 场景文件配置 | 🟢 已完成 | 按 §11.4 决策 B（混合搭建）在编辑器中配置完成 |
+| 4 | 移动端适配未实现 | ⚪ 待做 | 节点放大 48→64px，信息卡改底部弹窗（后续迭代） |
+| 5 | "进入关卡"按钮跳转 | 🟢 已接入 | 接入 `game.scene`（`GameBootstrap` 读取 `SessionState.selectedLevelId`，关卡战斗内容待 `level-{id}.json` 定义后填充） |
 
 ### 11.3 MainMenuBootstrap 集成状态
 
 - ✅ **已绑定**：BtnChallenge 点击 → `director.loadScene('level-select')`
-- ⚠️ **依赖**：需关卡选择场景和代码层重建完成后才能正常跳转
+- ✅ **正常跳转**：关卡选择场景与代码层已验收完成，跳转链路打通
 
 ### 11.4 开发前架构决策
 
@@ -347,18 +356,18 @@ GraphRay/
 | **E. 跨场景传参** | 新建 `core/SessionState.ts` 纯模块单例 | 与 SettingsManager 职责分离：SettingsManager 管持久环境变量（音量/语言），SessionState 管会话临时态（selectedLevelId / currentChapterIndex）。不持久化，生命周期 = 一次游戏会话。同时为未来多人房间预留扩展（roomId / matchMode 等）。详见 `level-select-dev-plan.md` §2.4、§4 |
 | **F. 关卡数据分层** | chapters.json + level-select-layout.json + level-{id}.json 三文件 | chapters.json 仅存关卡元数据（名称、描述）；level-select-layout.json 存场景布局参数（坐标、轨道、时序）；level-{id}.json 存战斗内容（待定义）。选择界面加载 chapters + layout，战斗场景按 selectedLevelId 加载对应 level-{id}.json。详见 `level-select-dev-plan.md` §2 |
 
-### 11.5 建议开发顺序（依赖驱动）
+### 11.5 开发顺序（依赖驱动，✅ 全部完成并验收 2026-07-10）
 
 ```
-Step 0  chapters.json（元数据） + level-select-layout.json（布局）   🔴 待重建
-Step 0.5  core/SessionState.ts（会话状态单例）                       🔴 待创建
-Step 1  core/LevelDataManager.ts                                  🔴 待重建
-Step 2  level-select/ 三个特效（StarfieldEffect / OrbitParticles / ScanSweep） ← 独立可并行
-Step 3  ui-tools/LevelNode.ts + ui-tools/LevelInfoCard.ts             ← 节点与信息卡视觉/状态/交互
-Step 4  ui-tools/ChapterTransition.ts                           ← 三段式过渡，协调上面各件
-Step 5  ui-tools/LevelSelectBootstrap.ts                        ← 集成入口，组装节点树+绑定
-Step 6  level-select.scene 节点树搭建 + 编辑器配置         ← 配合决策 B 混合搭建
-Step 7  联调：主菜单跳转 → 关卡选择 → 章节切换 → 进入关卡
+Step 0  chapters.json（元数据） + level-select-layout.json（布局）   ✅ 完成
+Step 0.5  core/SessionState.ts（会话状态单例）                       ✅ 完成
+Step 1  core/LevelDataManager.ts                                  ✅ 完成
+Step 2  level-select/ 特效（OrbitParticles / ScanSweep / CoreEffect / Starfield） ← 完成
+Step 3  ui-tools/LevelNode.ts + BubblePopup.ts（取代 LevelInfoCard）  ← 节点与详情视觉/状态/交互 完成
+Step 4  ui-tools/ChapterTransition.ts + ChapterTitle + ChapterDots ← 三段式过渡 + 导航 完成
+Step 5  ui-tools/LevelSelectBootstrap.ts                        ← 集成入口，组装节点树+绑定 完成
+Step 6  level-select.scene 节点树搭建 + 编辑器配置         ← 配合决策 B 混合搭建 完成
+Step 7  联调：主菜单跳转 → 关卡选择 → 章节切换 → 进入关卡   ✅ 验收通过
 ```
 
 ***

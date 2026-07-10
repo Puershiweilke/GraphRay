@@ -3,6 +3,7 @@
 > 设计分辨率：1920×1080 | HTML 原型：`outputs/graphray-levelselect.html`
 > Ardot 设计稿：`GraphRay-LevelSelect`（ID: `699900019329800`）
 > 更新日期：2026-07-06（拆分实现细节至 `level-select-dev-plan.md`）
+> ✅ **验收状态：已完成（2026-07-10）** —— 本需求档案描述的效果/美术已全部在 `level-select.scene` 实现并实机验收通过。细节落地见 `level-select-dev-plan.md` 与 GDD §11。
 
 ---
 

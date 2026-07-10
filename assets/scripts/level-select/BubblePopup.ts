@@ -52,6 +52,10 @@ export class BubblePopup extends Component {
     @property({ tooltip: '节点圆心到面板边缘的间距 (px)' })
     nodeGap: number = 36;
 
+    /** 面板初始生成时的额外上移量 (px)：正值=整体抬高，让气泡起点更靠上 */
+    @property({ tooltip: '初始生成时面板额外上移 (px，正值抬高)' })
+    spawnOffsetY: number = 20;
+
     // ============================================================
     // 色彩
     // ============================================================
@@ -196,15 +200,31 @@ export class BubblePopup extends Component {
     // 引导线
     // ============================================================
 
-    /** 引导线线宽 */
-    @property({ tooltip: '引导线线宽 (px)' })
-    guideLW: number = 4;
+    /** 引导线核心虚线线宽（细化：默认比面板描边更细） */
+    @property({ tooltip: '引导线虚线线宽 (px)' })
+    guideLW: number = 2;
 
-    /** 拐角菱形半对角线长 */
-    @property({ tooltip: '拐角菱形节点半径 (px)' })
-    guideDiamond: number = 4;
+    /** 虚线：实段长 */
+    @property({ tooltip: '虚线实段长 (px)' })
+    guideDash: number = 6;
 
-    // 引导线终点 Y 由角括号几何结构推算（见 _drawGuideLine），不再暴露为可调参数。
+    /** 虚线：间隔长 */
+    @property({ tooltip: '虚线间隔长 (px)' })
+    guideGap: number = 5;
+
+    /** 羽化光晕半宽（外围柔光，越大越虚） */
+    @property({ tooltip: '羽化光晕半宽 (px)' })
+    guideGlowW: number = 5;
+
+    /** 羽化光晕透明度 (0-255，越小越柔) */
+    @property({ tooltip: '羽化光晕 alpha (0-255)' })
+    guideGlowAlpha: number = 45;
+
+    /** 引导线落点相对顶边的下偏量 (px)。
+     *  落点【固定锁在上方近角】（不再随节点位置在顶/底角间翻转，根除开场乱串），
+     *  并向下偏移此值，使落点落在边角纵坐标附近、略离开顶边，视觉重心更居中。 */
+    @property({ tooltip: '引导线落点下偏量 (px)，固定落上方角 + 略下移' })
+    guideCornerDrop: number = 7;
 
     // ============================================================
     // 节点
@@ -269,6 +289,9 @@ export class BubblePopup extends Component {
     private _targetNode: Node | null = null;
     private _shown: boolean = false;
     private _tmpV3: Vec3 = new Vec3();
+    // 节点在【气泡本地坐标系】中的坐标（show 初值来自 targetPos 偏移；逐帧来自节点实时坐标）
+    private _nodeLocalX: number = 0;
+    private _nodeLocalY: number = 0;
 
     // ==================== 尺寸 ====================
 
@@ -386,6 +409,13 @@ export class BubblePopup extends Component {
         this._ph = Math.max(this.minHeight, h);
 
         this._calcPosition();
+        // 用「scale=1 假设」推导节点在气泡本地坐标中的位置（local = 节点世界坐标 − 气泡世界坐标），
+        // 与 update 中 _updateNodeLocal 完全同一公式。展开动画期间整块面板随 scale 放大，引导线端点世界位置
+        // = (tw-pw)*scale，从气泡中心平滑「生长」到节点，scale=1 时正中节点；不再 ÷scale（避免动画初期
+        // scale≈0 时坐标暴涨 / 虚线被 MAX_PER_SEG 截断 / 首帧除零守卫用旧值 → 起点「特别低」异常）。
+        this.node.updateWorldTransform(true);
+        if (this._targetNode) this._targetNode.updateWorldTransform(true);
+        this._updateNodeLocal();
         this._drawAll();
         this._animateOpen();
     }
@@ -417,8 +447,8 @@ export class BubblePopup extends Component {
         const s = this._openRight ? 1 : -1;
         const px = tx + s * (this.nodeRadius + this.nodeGap + this._pw / 2);
         // 顶部边缘钳制在轨道区上界内；底部边缘（topY - 面板高度）钳制在下界内，整体保证不溢出
-        // 期望顶边大致对齐节点上沿
-        const desiredTop = ty + this.nodeRadius;
+        // 期望顶边大致对齐节点上沿，再额外上抬 spawnOffsetY（默认 +20px）
+        const desiredTop = ty + this.nodeRadius + this.spawnOffsetY;
 
         // 钳制：保证整块面板落在可视区域内；放不下时整体上移/下移，
         // 若连整屏都放不下则纵向居中（超出部分由用户缩减文本量解决，绝不截断内容）。
@@ -435,18 +465,19 @@ export class BubblePopup extends Component {
     // ==================== 绘制 ====================
 
     private _drawAll(): void {
-        const px = this.node.position.x, py = this.node.position.y;
         // 面板 + 引导线共用同一 Graphics（_bgG）：同一坐标系（面板顶边中心为原点）+ 同一渲染通道，
         // 确保引导线一定可见（之前独立子节点 Graphics 因无 UITransform 未被 UI 渲染流纳入而整条不可见）。
         const g = this._bgG!; g.clear();
         this._drawPanel(g);
-        this._drawGuideLine(g, this.targetPos.x - px, this.targetPos.y - py);
+        this._drawGuide(g);
         this._updateLabels();
         this._drawCta();
     }
 
     private _drawPanel(g: Graphics): void {
         const w = this._pw, h = this._ph;
+        // 兜底：尺寸非有限或非法 → 不绘制，避免网格 for 循环在异常高度下失控
+        if (!Number.isFinite(w) || !Number.isFinite(h) || w <= 0 || h <= 0) return;
         const hw = w / 2, r = this.roundR;
         const top = 0, bot = -h;
 
@@ -470,65 +501,142 @@ export class BubblePopup extends Component {
         // 标签栏底条
         g.fillColor = new Color(this.colorAccent.r, this.colorAccent.g, this.colorAccent.b, this.tagBarAlpha);
         g.rect(-hw, top - this.tagBarH, w, this.tagBarH); g.fill();
+
+        // （引导线改为 L 形折线，从面板某一近角出发，见 _drawGuide）
     }
 
     /**
-     * 引导线：节点边缘 →（垂直）至角括号所在 Y →（水平）至角括号。Γ 形一笔画。
-     * 三个顶点均由几何结构推算，不依赖魔法数字：
-     *   A = 节点朝向面板一侧的边缘点 (srcX, srcY)
-     *   B = 肘点：与节点同 X、角括号竖臂中点的 Y 处 (srcX, endY)（垂直段终点）
-     *   C = 角括号竖臂中点 (edgeX, endY)（水平段终点），endY 由 cornerInset/cornerArm 推算
-     * 拐角菱形画在肘点 B，强调 Γ 转折。
-     * @param nodeCX/nodeCY 节点圆心在【气泡本地坐标系】中的坐标（由调用方传入：
-     *   初始帧来自 targetPos 相对气泡的偏移；逐帧帧来自节点实时 worldPosition 经 inverseTransformPoint）。
+     * 引导线（画在面板同一 _bgG 上，确保始终可见）：
+     *  - 路径：L 形正交折线 —— 从面板朝向节点一侧的【某一个近角】出发，
+     *          先水平延伸至节点 X 对齐处，再垂直落到节点边缘；
+     *          这样线头明确锚在气泡的四个角之一，指向关系一目了然。
+     *  - 样式：虚线核心（细、亮）+ 外围羽化光晕（宽、低透明填充带），
+     *          二者均用 fill 实现，避免与面板描边互相污染。
+     * 坐标体系：气泡本地坐标（原点 = 面板顶边中心，+y 向上、向下为负）。
      */
-    private _drawGuideLine(g: Graphics, nodeCX: number, nodeCY: number): void {
-        // 面板面对节点的那一侧边缘 X
-        // _openRight=true → 面板在右 → 近侧是左边缘（-hw）
-        const nearSign = this._openRight ? -1 : 1;
-        const edgeX = nearSign * this._pw / 2;
+    private _drawGuide(g: Graphics): void {
+        const pts = this._buildGuidePolyline();
+        if (pts.length < 2) return;
+        for (const p of pts) {
+            if (!Number.isFinite(p.x) || !Number.isFinite(p.y)) return;
+        }
 
-        // 顶点 A：节点朝向面板的那一侧边缘
-        const srcX = nodeCX - nearSign * this.nodeRadius;
-        const srcY = nodeCY;
+        // （1）羽化光晕：沿折线填充宽带状（淡），fill() 后清空 path
+        g.fillColor = new Color(this.colorGuide.r, this.colorGuide.g, this.colorGuide.b, this.guideGlowAlpha);
+        this._fillGlow(g, pts, this.guideGlowW);
 
-        // 顶点 B/C 的 Y：角括号竖臂中点（top=0，向下为负）
-        const endY = -(this.cornerInset + this.cornerArm / 2);
-
-        // Γ 形一笔画：A（节点边缘）→ B（垂直到角括号 Y）→ C（水平到角括号）
-        g.strokeColor = this.colorGuide;
-        g.lineWidth = this.guideLW;
-        g.moveTo(srcX, srcY);       // A：节点边缘
-        g.lineTo(srcX, endY);       // B：垂直段（肘点，与节点同 X）
-        g.lineTo(edgeX, endY);      // C：水平段至角括号
-        g.stroke();
-
-        // 拐角菱形（画在肘点 B）
-        const d = this.guideDiamond;
+        // （2）虚线核心：沿折线填充小四边形（亮），覆盖在光晕之上
         g.fillColor = this.colorGuide;
-        g.moveTo(srcX + d, endY);
-        g.lineTo(srcX, endY + d);
-        g.lineTo(srcX - d, endY);
-        g.lineTo(srcX, endY - d);
+        this._drawDashedPolyline(g, pts, this.guideLW, this.guideDash, this.guideGap);
+    }
+
+    /** 构造引导线折线（气泡本地坐标）：[近角, 水平拐点, 节点边缘点] */
+    private _buildGuidePolyline(): { x: number; y: number }[] {
+        const w = this._pw, r = this.nodeRadius;
+        const openR = this._openRight;                       // 节点在左→面板在右→近边=左；反之近边=右
+        const nearX = openR ? -w / 2 : w / 2;               // 面板近边 x
+        // 落点【固定锁在上方近角】：不再随 _nodeLocalY 在 0 / -h 间翻转（开场动画 scale 变化会让
+        // _nodeLocalY 抖动 → 角在顶/底跳 → 视觉乱串）。并向下偏移 guideCornerDrop，
+        // 落点落在边角纵坐标附近、略离开顶边，视觉重心更居中。
+        const cornerY = -this.guideCornerDrop;
+        const corner = { x: nearX, y: cornerY };
+        // 节点朝向面板一侧的【上角】（左上 / 右上，取决于面板在节点哪侧）：
+        // edgeX 取气泡侧那一边的边缘，edgeY 取节点顶边（nodeLocalY + r），
+        // 故线头钉在关卡节点的上角，而非侧心。
+        const edgeX = openR ? (this._nodeLocalX + r) : (this._nodeLocalX - r);
+        const edge = { x: edgeX, y: this._nodeLocalY + r };
+        return [corner, { x: edgeX, y: cornerY }, edge];     // L 形：角 → 水平拐点 → 节点上角
+    }
+
+    /** 沿折线填充一条宽 gw 的发光带（顶点法线偏移，近似圆角） */
+    private _fillGlow(g: Graphics, pts: { x: number; y: number }[], gw: number): void {
+        const m = pts.length;
+        if (m < 2) return;
+        const left: { x: number; y: number }[] = [];
+        const right: { x: number; y: number }[] = [];
+        for (let i = 0; i < m; i++) {
+            const prev = pts[Math.max(0, i - 1)];
+            const next = pts[Math.min(m - 1, i + 1)];
+            let tx = next.x - prev.x, ty = next.y - prev.y;
+            const tl = Math.hypot(tx, ty);
+            if (tl < 1e-6) { tx = 1; ty = 0; }
+            const nx = -ty / tl, ny = tx / tl;
+            left.push({ x: pts[i].x + nx * gw, y: pts[i].y + ny * gw });
+            right.push({ x: pts[i].x - nx * gw, y: pts[i].y - ny * gw });
+        }
+        g.moveTo(left[0].x, left[0].y);
+        for (let i = 1; i < m; i++) g.lineTo(left[i].x, left[i].y);
+        for (let i = m - 1; i >= 0; i--) g.lineTo(right[i].x, right[i].y);
         g.close();
         g.fill();
     }
 
+    /** 沿折线以填充小四边形的方式画虚线（带上限防卡死） */
+    private _drawDashedPolyline(g: Graphics, pts: { x: number; y: number }[], lw: number, dash: number, gap: number): void {
+        const t = lw / 2;
+        const step = Math.max(1e-3, dash + gap);   // 步长强制为正，避免用户在 Inspector 调到 ≤0 时死循环
+        const dDash = Math.max(0.5, dash);          // 实段长强制为正
+        const MAX_PER_SEG = 2000;                   // 每段虚线硬上限，杜绝 O(长度) 卡死
+        for (let i = 0; i < pts.length - 1; i++) {
+            const x0 = pts[i].x, y0 = pts[i].y, x1 = pts[i + 1].x, y1 = pts[i + 1].y;
+            const dx = x1 - x0, dy = y1 - y0;
+            const len = Math.hypot(dx, dy);
+            if (!Number.isFinite(len) || len <= 1e-3) continue;
+            const ux = dx / len, uy = dy / len;
+            const nx = -uy, ny = ux;
+            let d = 0, c = 0;
+            while (d < len && c++ < MAX_PER_SEG) {
+                const s = d, e = Math.min(d + dDash, len);
+                const ax = x0 + ux * s, ay = y0 + uy * s;
+                const bx = x0 + ux * e, by = y0 + uy * e;
+                g.moveTo(ax - nx * t, ay - ny * t);
+                g.lineTo(ax + nx * t, ay + ny * t);
+                g.lineTo(bx + nx * t, by + ny * t);
+                g.lineTo(bx - nx * t, by - ny * t);
+                g.close();
+                d += step;
+            }
+        }
+        g.fill();
+    }
+
     /**
-     * 每帧：若正在显示且目标节点有效，读节点实时世界坐标 → 转气泡本地 → 重绘面板 + 引导线。
-     * 引导线起点始终粘在关卡节点的浮动位置上，不再脱节。
-     * 用 inverseTransformPoint（含气泡节点的缩放/位置逆变换），即便展开动画期间缩放 < 1 也能正确贴合。
+     * 每帧：若正在显示且目标节点有效，重绘面板 + 引导线，使连线末端始终粘在关卡节点上。
      */
     update(dt: number): void {
-        // 防御：场景切换 / 节点销毁过程中，本组件可能处于半销毁态，此时再写属性可能触发引擎内部
-        // `this._field.equals(value)` 在 null 上的崩溃。先校验存活再绘制。
+        // 防御：场景切换 / 节点销毁过程中，本组件可能处于半销毁态，先校验存活再绘制。
         if (!this._shown || !this.node.isValid) return;
         if (!this._targetNode || !this._targetNode.isValid) return;
-        this.node.inverseTransformPoint(this._tmpV3, this._targetNode.worldPosition);
+
+        // scale=1 假设推导节点本地坐标（见 _updateNodeLocal）：与 show() 首帧公式完全一致，
+        // 动画全程坐标连续、不会跳变（根除乱串）；不再受 scale≈0 放大影响。
+        this._updateNodeLocal();
+
         // 引导线与面板共用 _bgG：整块重绘（面板 + 引导线）。Label/CTA 为独立子节点，不受此 clear 影响。
         const g = this._bgG!; g.clear();
         this._drawPanel(g);
-        this._drawGuideLine(g, this._tmpV3.x, this._tmpV3.y);
+        this._drawGuide(g);
+    }
+
+    /**
+     * 计算目标节点在【气泡本地坐标系】中的位置，写入 _nodeLocalX/Y。
+     * 公式：本地偏移 = (节点世界坐标 − 气泡世界坐标) ÷ 气泡缩放。
+     *   - 使用世界坐标差而非父空间坐标差，可免疫 OrbitZone / LevelNodePool 等任意祖先变换；
+     *   - 除以气泡自身缩放，保证即使展开动画期间 scale<1，连线末端也精确落在节点世界上（不飘、不乱串）。
+     */
+    private _updateNodeLocal(): void {
+        if (!this._targetNode || !this._targetNode.isValid) return;
+        // scale=1 假设：local = 节点世界坐标 − 气泡世界坐标。
+        // 不再除以气泡缩放（旧做法在展开动画 scale≈0 时坐标暴涨 → 虚线被 MAX_PER_SEG 截断、
+        // 且首帧 scale=0 时除零守卫导致用旧值 → 引导线起点「特别低」的异常）。
+        // 改用 scale=1 假设后：展开动画期间整块面板随 scale 放大，引导线端点世界位置 = (tw-pw)*scale，
+        // 从气泡中心平滑「生长」到节点，scale=1 时正中节点；动画结束后精确钉在节点上（含浮动）。
+        this.node.updateWorldTransform(true);
+        this._targetNode.updateWorldTransform(true);
+        const pw = this.node.worldPosition;
+        const tw = this._targetNode.worldPosition;
+        this._nodeLocalX = tw.x - pw.x;
+        this._nodeLocalY = tw.y - pw.y;
     }
 
     /** 节点销毁时清理：断开跨场景引用、停掉残留 tween / 定时器，

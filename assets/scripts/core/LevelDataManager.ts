@@ -83,13 +83,14 @@ export class LevelDataManager {
                 // 进度加载：服务端优先 → localStorage
                 const saved = await this._loadProgress();
 
-                this._chapters = data.chapters.map(ch => ({
-                    ...ch,
-                    // completedIds = 玩家通关进度（运行时，来自存档）。
-                    // levels[].completed = 作者制作标志（静态，由 ...ch 透传，来自 chapters.json）。
-                    // 二者互不干扰：completed 不在此派生、不写入存档。
-                    completedIds: saved[ch.id] ?? [],
-                }));
+                this._chapters = data.chapters.map(ch => {
+                    // 数据边界加固：chapters.json 或旧存档异常时，levels / completedIds
+                    // 可能缺失或为 null，统一兜底为数组，根除「读取 .length 报 null」类崩溃。
+                    const levels = Array.isArray((ch as any).levels) ? (ch as any).levels : [];
+                    const rawIds = (saved as any)[ch.id];
+                    const completedIds = Array.isArray(rawIds) ? rawIds : [];
+                    return { ...ch, levels, completedIds };
+                });
 
                 // 开发期护栏：交叉校验 completed 标志与战斗文件是否一致（仅 console 警告，不影响逻辑）
                 this._validateLevelFiles();
@@ -203,8 +204,8 @@ export class LevelDataManager {
 
     getChapterProgress(chapterIndex: number): number {
         const ch = this._chapters[chapterIndex];
-        if (!ch || ch.levels.length === 0) return 0;
-        return Math.min(ch.completedIds.length / ch.levels.length, 1);
+        if (!ch || (ch.levels?.length ?? 0) === 0) return 0;
+        return Math.min((ch.completedIds?.length ?? 0) / (ch.levels?.length ?? 1), 1);
     }
 
     // ==================== 章节解锁（跨章） ====================
@@ -372,11 +373,11 @@ export class LevelDataManager {
     }
 
     private _totalCompleted(): number {
-        return this._chapters.reduce((s, c) => s + c.completedIds.length, 0);
+        return this._chapters.reduce((s, c) => s + (c.completedIds?.length ?? 0), 0);
     }
 
     private _totalLevels(): number {
-        return this._chapters.reduce((s, c) => s + c.levels.length, 0);
+        return this._chapters.reduce((s, c) => s + (c.levels?.length ?? 0), 0);
     }
 
     /**
