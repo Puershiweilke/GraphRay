@@ -40,3 +40,17 @@ zzy-cocoscreator-dev.zip
 # 日志
 #//////////////////////////
 *.log
+
+#//////////////////////////
+# 不入库的敏感 / 本地配置（token、真实服务器地址）
+# 说明：.env 与 *.local.json 存「开发密钥 / 本地运行时覆盖」，永不入库；
+#       构建前由 tools/inject-config.js 把它们注入为 assets/resources/configs/runtime.json（同样不入库，但进构建包）。
+#//////////////////////////
+.env
+.env.*
+!.env.example
+config.local.json
+*.local.json
+private/
+# 由 inject-config.js 从本地配置生成的运行时配置（不入库，构建时生成）
+assets/resources/configs/runtime.json
