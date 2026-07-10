@@ -1,9 +1,0 @@
-{
-  "_comment": "运行时配置模板（提交入库，作为 schema/占位）。构建前由 tools/inject-config.js 用 config.local.json 覆盖生成为 runtime.json（gitignore）。客户端通过 resources.load('configs/runtime', JsonAsset) 读取 server.host/port/protocol。",
-  "server": {
-    "host": "127.0.0.1",
-    "port": 3000,
-    "protocol": "ws"
-  },
-  "env": "dev"
-}
